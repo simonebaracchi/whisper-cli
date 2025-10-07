@@ -1,4 +1,5 @@
-import openai
+from openai import OpenAI
+
 from typing import Optional
 import typer
 from rich import print
@@ -19,7 +20,7 @@ def get_file_type(file_name: str) -> str:
 def _check_response_format(response_format: Optional[str]):
     if response_format is None:
         return None
-    elif response_format in ["json", "srt", "verbose_json", "vtt"]:
+    elif response_format in ["json", "text", "srt", "verbose_json", "vtt"]:
         return response_format
     else:
         raise ValueError("Response format not supported by OpenAI.")
@@ -56,13 +57,8 @@ def get_api_key(env: str = "default") -> str:
 
 def show_result(result, response_format: Optional[str]):
     """Show result."""
-    if response_format is None:
-        response_format = "json"
 
-    if response_format == "json":
-        print(result["text"])
-    else:
-        print(result)
+    print(result)
 
 
 @app.command()
@@ -75,16 +71,23 @@ def transcribe(
     language: Optional[str] = None,
 ):
     """Transcribe audio file using whisper."""
-    openai.api_key = get_api_key()
+    client = OpenAI(api_key=get_api_key())
 
-    transcript = openai.Audio.transcribe(
-        model,
-        get_file_content(file_name),
-        prompt=prompt,
-        response_format=_check_response_format(response_format),
-        temperature=temperature,
-        language=language,
-    )
+    # Create kwargs dict, only including non-None values
+    kwargs = {
+        "model": model,
+        "file": get_file_content(file_name),
+        "temperature": temperature,
+    }
+
+    if prompt is not None:
+        kwargs["prompt"] = prompt
+    if response_format is not None:
+        kwargs["response_format"] = _check_response_format(response_format)
+    if language is not None:
+        kwargs["language"] = language
+
+    transcript = client.audio.transcriptions.create(**kwargs)
 
     # TODO: return based on response_format
     show_result(transcript, response_format)
@@ -99,15 +102,21 @@ def translate(
     temperature: float = 0,
 ):
     """Translate audio file using whisper."""
-    openai.api_key = get_api_key()
+    client = OpenAI(api_key=get_api_key())
 
-    translation = openai.Audio.translate(
-        model,
-        get_file_content(file_name),
-        prompt=prompt,
-        response_format=_check_response_format(response_format),
-        temperature=temperature,
-    )
+    # Create kwargs dict, only including non-None values
+    kwargs = {
+        "model": model,
+        "file": get_file_content(file_name),
+        "temperature": temperature,
+    }
+
+    if prompt is not None:
+        kwargs["prompt"] = prompt
+    if response_format is not None:
+        kwargs["response_format"] = _check_response_format(response_format)
+
+    translation = client.audio.translations.create(**kwargs)
 
     show_result(translation, response_format)
 
